@@ -30,20 +30,5 @@ export const loginSchema = z.object({
 
 export type RegisterInput = z.infer<typeof registerSchema>;
 export type LoginInput = z.infer<typeof loginSchema>;
-export type FieldErrors = Record<string, string[]>;
 
-export function toFieldErrors(error: z.ZodError): FieldErrors {
-  const fieldErrors: FieldErrors = {};
-
-  for (const issue of error.issues) {
-    const key = issue.path[0];
-
-    if (typeof key !== "string") {
-      continue;
-    }
-
-    fieldErrors[key] = [...(fieldErrors[key] ?? []), issue.message];
-  }
-
-  return fieldErrors;
-}
+export { type FieldErrors, toFieldErrors } from "@/lib/validations/shared";

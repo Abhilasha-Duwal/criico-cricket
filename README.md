@@ -2,7 +2,7 @@
 
 A cricket team management application built with Next.js 15, React 19, TypeScript, Tailwind CSS, Prisma 6, and PostgreSQL.
 
-The project currently provides the application foundation and complete cookie-based JWT authentication: Next.js App Router, Tailwind styling, verified route protection middleware, registration and login flows, a Prisma schema with an applied initial migration, and a reusable Prisma client. Cricket management features are not implemented yet.
+The project currently provides the application foundation, complete cookie-based JWT authentication, and team/player management: Next.js App Router, Tailwind styling, verified route protection middleware, registration and login flows, player CRUD APIs, a Server Action for creating players, a Prisma schema with an applied initial migration, and a reusable Prisma client. Match and performance management are not implemented yet.
 
 ## Tech stack
 
@@ -110,11 +110,27 @@ Never commit the real value or expose it to client components.
 │   └── schema.prisma
 ├── src/
 │   ├── app/
-│   │   ├── api/auth/
-│   │   │   ├── login/route.ts
-│   │   │   ├── logout/route.ts
-│   │   │   └── register/route.ts
+│   │   ├── api/
+│   │   │   ├── auth/
+│   │   │   │   ├── login/route.ts
+│   │   │   │   ├── logout/route.ts
+│   │   │   │   └── register/route.ts
+│   │   │   ├── players/
+│   │   │   │   ├── [id]/route.ts
+│   │   │   │   └── route.ts
+│   │   │   └── teams/
+│   │   │       ├── [id]/route.ts
+│   │   │       └── route.ts
 │   │   ├── dashboard/
+│   │   │   ├── _actions/
+│   │   │   │   ├── players.ts
+│   │   │   │   └── teams.ts
+│   │   │   ├── players/[id]/
+│   │   │   │   ├── edit/page.tsx
+│   │   │   │   ├── not-found.tsx
+│   │   │   │   └── page.tsx
+│   │   │   ├── error.tsx
+│   │   │   ├── loading.tsx
 │   │   │   ├── LogoutButton.tsx
 │   │   │   └── page.tsx
 │   │   ├── login/
@@ -127,12 +143,32 @@ Never commit the real value or expose it to client components.
 │   │   ├── icon.svg
 │   │   ├── layout.tsx
 │   │   └── page.tsx
+│   ├── components/
+│   │   ├── AddPlayerForm.tsx
+│   │   ├── AddTeamForm.tsx
+│   │   ├── DeleteTeamButton.tsx
+│   │   ├── EditPlayerForm.tsx
+│   │   ├── FieldError.tsx
+│   │   ├── PlayerFilters.tsx
+│   │   ├── PlayerFormFields.tsx
+│   │   ├── PlayerTable.tsx
+│   │   └── TeamManager.tsx
 │   ├── lib/
-│   │   ├── validations/auth.ts
+│   │   ├── validations/
+│   │   │   ├── auth.ts
+│   │   │   ├── player.ts
+│   │   │   ├── shared.ts
+│   │   │   └── team.ts
+│   │   ├── api.ts
 │   │   ├── auth.ts
+│   │   ├── format.ts
+│   │   ├── form-state.ts
 │   │   ├── jwt.ts
+│   │   ├── player-constants.ts
+│   │   ├── players.ts
 │   │   ├── prisma.ts
-│   │   └── redirect.ts
+│   │   ├── redirect.ts
+│   │   └── teams.ts
 │   ├── types/css.d.ts
 │   └── middleware.ts
 ├── .env.example
@@ -154,13 +190,22 @@ Never commit the real value or expose it to client components.
 | `/` | Public | Home page |
 | `/login` | Public | Login form; authenticated users are redirected to the dashboard |
 | `/register` | Public | Registration form; authenticated users are redirected to the dashboard |
-| `/dashboard` | Protected | Requires a valid, unexpired JWT session |
+| `/dashboard` | Protected | Player listing, filters, add-player form, and team manager |
+| `/dashboard/players/[id]` | Protected | Player details |
+| `/dashboard/players/[id]/edit` | Protected | Edit player form |
 
 | API route | Description |
 | --- | --- |
 | `POST /api/auth/register` | Validates input, checks duplicate email, hashes the password, creates the user, and sets a session cookie |
 | `POST /api/auth/login` | Validates credentials, compares the bcrypt hash, and sets a session cookie |
 | `POST /api/auth/logout` | Clears the session cookie |
+| `GET /api/players` | Lists players; supports optional `teamId` and `role` query filters |
+| `POST /api/players` | Creates a player after Zod validation and team-reference validation |
+| `GET /api/players/[id]` | Returns one player |
+| `PUT /api/players/[id]` | Updates one player |
+| `GET /api/teams` | Lists teams with player counts |
+| `POST /api/teams` | Creates a team; duplicate names are rejected case-insensitively |
+| `DELETE /api/teams/[id]` | Deletes an empty team; returns `409` when players or matches reference it |
 
 The middleware protects `/dashboard/:path*`, verifies the JWT signature and expiration with `jose`, redirects unauthenticated users to `/login?next=<original-path>`, and redirects authenticated users away from `/login` and `/register`. The `next` destination is validated to prevent open redirects.
 
@@ -172,6 +217,16 @@ The middleware protects `/dashboard/:path*`, verifies the JWT signature and expi
 4. **Logout** — `POST /api/auth/logout` expires the session cookie and the dashboard redirects to `/login`.
 
 The cookie is `httpOnly`, `sameSite=lax`, `secure` in production, and expires after 7 days. Passwords and password hashes are never returned by the API.
+
+## Team and player management
+
+- The dashboard requires a valid session. All player and team APIs also verify the session on the server and return `401` with a structured error when it is missing or invalid.
+- The player listing is responsive, with a table on larger screens and cards on mobile. Filters for team and role are applied server-side through the URL query string.
+- The **Add player** form is implemented as a Next.js Server Action (`src/app/dashboard/_actions/players.ts`). It validates the submitted `FormData` with Zod, verifies the selected team exists, creates the player with Prisma, and revalidates the dashboard.
+- The **Edit player** form uses `PUT /api/players/[id]`. It shows field-level validation errors, a loading state, and redirects back to the player details page on success.
+- Team creation uses a Server Action. Team deletion uses `DELETE /api/teams/[id]` and refuses to delete a team with existing players or match history.
+- Zod validates all player fields. `basePrice`, `matchesPlayed`, `totalRuns`, and `totalWickets` must be non-negative; integer fields must be whole numbers. The existing database CHECK constraints provide a second layer of protection.
+- IDs submitted by the client are never trusted for authorization. The session identifies the user, player IDs are checked against the database, and team IDs are validated before create or update.
 
 ## Database schema
 
@@ -196,12 +251,16 @@ Implemented:
 - HTTP-only session cookies with signature and expiration verification
 - Protected dashboard and auth-route redirects in middleware
 - Server-side session validation with `getCurrentUser()` / `requireUser()`
+- Team creation/listing with duplicate-name protection and safe deletion
+- Player create, list, detail, edit, team selection, and team/role filters
+- Add-player Server Action and authenticated player/team APIs
+- Responsive dashboard with loading, empty, and error states
 - Zod validation and field-level error responses
 - Prisma schema, initial migration, and reusable client
 
 Not yet implemented:
 
-- Team, player, match, and performance CRUD features
-- Role-based authorization
+- Match and performance management
+- Role-based authorization and per-user data ownership
 - Rate limiting and brute-force protection
 - Automated test suite and seed data
