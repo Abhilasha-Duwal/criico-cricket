@@ -130,7 +130,10 @@ Never commit the real value or expose it to client components.
 │   │   │   ├── _actions/
 │   │   │   │   ├── players.ts
 │   │   │   │   └── teams.ts
-│   │   │   ├── leaderboard/page.tsx
+│   │   │   ├── leaderboard/
+│   │   │   │   ├── error.tsx
+│   │   │   │   ├── loading.tsx
+│   │   │   │   └── page.tsx
 │   │   │   ├── matches/page.tsx
 │   │   │   ├── players/[id]/
 │   │   │   │   ├── edit/page.tsx
@@ -178,6 +181,8 @@ Never commit the real value or expose it to client components.
 │   │   ├── impact-score.test.ts
 │   │   ├── impact-score.ts
 │   │   ├── jwt.ts
+│   │   ├── leaderboard-data.ts
+│   │   ├── leaderboard.test.ts
 │   │   ├── leaderboard.ts
 │   │   ├── match-idempotency.test.ts
 │   │   ├── match-idempotency.ts
@@ -219,7 +224,7 @@ Never commit the real value or expose it to client components.
 | `POST /api/auth/register` | Validates input, checks duplicate email, hashes the password, creates the user, and sets a session cookie |
 | `POST /api/auth/login` | Validates credentials, compares the bcrypt hash, and sets a session cookie |
 | `POST /api/auth/logout` | Clears the session cookie |
-| `GET /api/leaderboard` | Returns players ranked by Impact Score |
+| `GET /api/leaderboard` | Returns ranked players with team, role, matches, runs, wickets, and Impact Score; `401` when unauthenticated, `500` on database failure |
 | `GET /api/matches` | Lists recorded matches with teams, winner, and player performances |
 | `POST /api/matches` | Records a match and its player performances in one transaction; supports idempotent retries |
 | `GET /api/players` | Lists players; supports optional `teamId` and `role` query filters |
@@ -254,6 +259,8 @@ The cookie is `httpOnly`, `sameSite=lax`, `secure` in production, and expires af
 ## Impact Score
 
 Impact Score is calculated by the shared `calculateImpactScore()` function in `src/lib/impact-score.ts`. The leaderboard page, `GET /api/leaderboard`, player API responses, and player details all use this same function.
+
+The leaderboard page is an async React Server Component. It calls `getLeaderboard()` in `src/lib/leaderboard-data.ts`, which performs one Prisma query through `listPlayers()` and then calls the shared `buildLeaderboard()` scoring and sorting utility. `GET /api/leaderboard` uses the same `getLeaderboard()` path and then serializes the result with `serializeLeaderboard()`, returning only the required player fields and no sensitive user data. The page is wrapped by route-level `loading.tsx` and `error.tsx` boundaries.
 
 The formula is:
 
@@ -333,7 +340,7 @@ Implemented:
 - Match recording with two-team selection, optional winner, and player performances
 - Transactional match, performance, and aggregate-stat updates with idempotent retries
 - Recorded match history and authenticated matches API
-- Vitest unit tests for Impact Score, match validation, and idempotency
+- Vitest unit tests for Impact Score, leaderboard ranking/serialization, match validation, and idempotency
 - Responsive dashboard with loading, empty, and error states
 - Zod validation and field-level error responses
 - Prisma schema, initial migration, and reusable client

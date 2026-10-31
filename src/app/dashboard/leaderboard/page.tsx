@@ -1,14 +1,12 @@
 import Link from "next/link";
 import LeaderboardTable from "@/components/LeaderboardTable";
 import { requireUser } from "@/lib/auth";
-import { buildLeaderboard } from "@/lib/leaderboard";
-import { listPlayers } from "@/lib/players";
+import { getLeaderboard } from "@/lib/leaderboard-data";
 
 export default async function LeaderboardPage() {
   await requireUser();
 
-  const players = await listPlayers();
-  const leaderboard = buildLeaderboard(players);
+  const leaderboard = await getLeaderboard();
 
   return (
     <main className="mx-auto max-w-7xl px-4 py-8 sm:px-6 lg:px-8 lg:py-12">

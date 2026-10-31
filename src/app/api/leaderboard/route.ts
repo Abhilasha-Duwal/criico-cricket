@@ -1,8 +1,7 @@
 import { NextResponse } from "next/server";
 import { apiError } from "@/lib/api";
 import { getCurrentUser } from "@/lib/auth";
-import { buildLeaderboard } from "@/lib/leaderboard";
-import { listPlayers, serializePlayer } from "@/lib/players";
+import { getSerializedLeaderboard } from "@/lib/leaderboard-data";
 
 export const runtime = "nodejs";
 
@@ -12,16 +11,9 @@ export async function GET() {
   }
 
   try {
-    const players = await listPlayers();
-    const leaderboard = buildLeaderboard(players);
+    const leaderboard = await getSerializedLeaderboard();
 
-    return NextResponse.json({
-      leaderboard: leaderboard.map(({ rank, impactScore, player }) => ({
-        rank,
-        impactScore,
-        player: serializePlayer(player),
-      })),
-    });
+    return NextResponse.json({ leaderboard });
   } catch (error) {
     console.error("Load leaderboard failed:", error);
 

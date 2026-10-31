@@ -7,6 +7,25 @@ export type LeaderboardEntry = {
   player: PlayerWithTeam;
 };
 
+export type LeaderboardPlayer = {
+  id: string;
+  name: string;
+  team: {
+    id: string;
+    name: string;
+  };
+  role: PlayerWithTeam["role"];
+  matchesPlayed: number;
+  totalRuns: number;
+  totalWickets: number;
+};
+
+export type SerializedLeaderboardEntry = {
+  rank: number;
+  impactScore: number;
+  player: LeaderboardPlayer;
+};
+
 export function buildLeaderboard(
   players: PlayerWithTeam[],
 ): LeaderboardEntry[] {
@@ -29,4 +48,25 @@ export function buildLeaderboard(
       ...entry,
       rank: index + 1,
     }));
+}
+
+export function serializeLeaderboard(
+  entries: LeaderboardEntry[],
+): SerializedLeaderboardEntry[] {
+  return entries.map(({ rank, impactScore, player }) => ({
+    rank,
+    impactScore,
+    player: {
+      id: player.id,
+      name: player.name,
+      team: {
+        id: player.team.id,
+        name: player.team.name,
+      },
+      role: player.role,
+      matchesPlayed: player.matchesPlayed,
+      totalRuns: player.totalRuns,
+      totalWickets: player.totalWickets,
+    },
+  }));
 }
