@@ -3,9 +3,11 @@
 import { revalidatePath } from "next/cache";
 import { getCurrentUser } from "@/lib/auth";
 import type { FormActionState } from "@/lib/form-state";
+import {
+  readPlayerFormValues,
+  validatePlayerFormValues,
+} from "@/lib/player-form-validation";
 import { createPlayer, TeamNotFoundError } from "@/lib/players";
-import { playerInputSchema } from "@/lib/validations/player";
-import { toFieldErrors } from "@/lib/validations/shared";
 
 export async function createPlayerAction(
   _previousState: FormActionState,
@@ -18,23 +20,14 @@ export async function createPlayerAction(
     };
   }
 
-  const values = {
-    name: String(formData.get("name") ?? ""),
-    role: String(formData.get("role") ?? ""),
-    basePrice: String(formData.get("basePrice") ?? ""),
-    matchesPlayed: String(formData.get("matchesPlayed") ?? ""),
-    totalRuns: String(formData.get("totalRuns") ?? ""),
-    totalWickets: String(formData.get("totalWickets") ?? ""),
-    teamId: String(formData.get("teamId") ?? ""),
-  };
-
-  const parsed = playerInputSchema.safeParse(values);
+  const values = readPlayerFormValues(formData);
+  const parsed = validatePlayerFormValues(values);
 
   if (!parsed.success) {
     return {
       status: "error",
-      message: "Please fix the highlighted fields.",
-      fieldErrors: toFieldErrors(parsed.error),
+      message: parsed.message,
+      fieldErrors: parsed.fieldErrors,
       values,
     };
   }

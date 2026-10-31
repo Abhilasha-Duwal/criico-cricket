@@ -169,6 +169,7 @@ Never commit the real value or expose it to client components.
 │   │   └── TeamManager.tsx
 │   ├── lib/
 │   │   ├── validations/
+│   │   │   ├── auth.test.ts
 │   │   │   ├── auth.ts
 │   │   │   ├── match.test.ts
 │   │   │   ├── match.ts
@@ -182,6 +183,7 @@ Never commit the real value or expose it to client components.
 │   │   ├── form-state.ts
 │   │   ├── impact-score.test.ts
 │   │   ├── impact-score.ts
+│   │   ├── jwt.test.ts
 │   │   ├── jwt.ts
 │   │   ├── leaderboard-data.ts
 │   │   ├── leaderboard.test.ts
@@ -194,6 +196,7 @@ Never commit the real value or expose it to client components.
 │   │   ├── player-form-validation.ts
 │   │   ├── players.ts
 │   │   ├── prisma.ts
+│   │   ├── redirect.test.ts
 │   │   ├── redirect.ts
 │   │   └── teams.ts
 │   ├── types/css.d.ts
@@ -346,7 +349,7 @@ Implemented:
 - Match recording with two-team selection, optional winner, and player performances
 - Transactional match, performance, and aggregate-stat updates with idempotent retries
 - Recorded match history and authenticated matches API
-- Vitest unit tests for Impact Score, leaderboard ranking/serialization, player form/server validation, match validation, and idempotency
+- Vitest unit tests for authentication validation, JWT session tokens, safe redirects, Impact Score, leaderboard ranking/serialization, player form/server validation, match validation, and idempotency
 - Client and server validation for negative player statistics, with Sonner toasts and inline field errors
 - Responsive dashboard with loading, empty, and error states
 - Zod validation and field-level error responses

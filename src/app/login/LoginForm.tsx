@@ -2,8 +2,8 @@
 
 import { useRouter } from "next/navigation";
 import { useState, type FormEvent } from "react";
-
-type FieldErrors = Record<string, string[]>;
+import FieldError from "@/components/FieldError";
+import type { FieldErrors } from "@/lib/validations/shared";
 
 type AuthResponse = {
   error?: string;
@@ -13,14 +13,6 @@ type AuthResponse = {
 type LoginFormProps = {
   nextPath: string;
 };
-
-function FieldError({ messages }: { messages?: string[] }) {
-  if (!messages?.length) {
-    return null;
-  }
-
-  return <p className="text-sm text-red-400">{messages.join(" ")}</p>;
-}
 
 export default function LoginForm({ nextPath }: LoginFormProps) {
   const router = useRouter();

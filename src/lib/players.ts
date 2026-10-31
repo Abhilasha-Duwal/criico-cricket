@@ -46,6 +46,13 @@ async function ensureTeamExists(teamId: string): Promise<void> {
   }
 }
 
+function isPrismaError(error: unknown, code: string): boolean {
+  return (
+    error instanceof Prisma.PrismaClientKnownRequestError &&
+    error.code === code
+  );
+}
+
 export async function listPlayers(
   filters: { teamId?: string; role?: PlayerInput["role"] } = {},
 ): Promise<PlayerWithTeam[]> {
@@ -80,10 +87,18 @@ export async function createPlayer(
 ): Promise<PlayerWithTeam> {
   await ensureTeamExists(input.teamId);
 
-  return prisma.player.create({
-    data: playerData(input),
-    include: playerInclude,
-  });
+  try {
+    return await prisma.player.create({
+      data: playerData(input),
+      include: playerInclude,
+    });
+  } catch (error) {
+    if (isPrismaError(error, "P2003")) {
+      throw new TeamNotFoundError();
+    }
+
+    throw error;
+  }
 }
 
 export async function updatePlayer(
@@ -101,11 +116,23 @@ export async function updatePlayer(
 
   await ensureTeamExists(input.teamId);
 
-  return prisma.player.update({
-    where: { id },
-    data: playerData(input),
-    include: playerInclude,
-  });
+  try {
+    return await prisma.player.update({
+      where: { id },
+      data: playerData(input),
+      include: playerInclude,
+    });
+  } catch (error) {
+    if (isPrismaError(error, "P2003")) {
+      throw new TeamNotFoundError();
+    }
+
+    if (isPrismaError(error, "P2025")) {
+      return null;
+    }
+
+    throw error;
+  }
 }
 
 export function serializePlayer(player: PlayerWithTeam) {
