@@ -1,4 +1,5 @@
 import { Prisma } from "@prisma/client";
+import { calculateImpactScore } from "@/lib/impact-score";
 import { prisma } from "@/lib/prisma";
 import type { PlayerInput } from "@/lib/validations/player";
 
@@ -111,5 +112,11 @@ export function serializePlayer(player: PlayerWithTeam) {
   return {
     ...player,
     basePrice: Number(player.basePrice),
+    impactScore: calculateImpactScore({
+      role: player.role,
+      runs: player.totalRuns,
+      wickets: player.totalWickets,
+      matchesPlayed: player.matchesPlayed,
+    }),
   };
 }

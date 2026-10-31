@@ -16,3 +16,9 @@ export function formatCurrency(value: number | string): string {
 export function formatDate(value: Date | string): string {
   return dateFormatter.format(new Date(value));
 }
+
+export function formatImpactScore(value: number): string {
+  return value.toLocaleString("en-IN", {
+    maximumFractionDigits: 2,
+  });
+}

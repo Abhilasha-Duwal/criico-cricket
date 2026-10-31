@@ -2,7 +2,7 @@
 
 A cricket team management application built with Next.js 15, React 19, TypeScript, Tailwind CSS, Prisma 6, and PostgreSQL.
 
-The project currently provides the application foundation, complete cookie-based JWT authentication, and team/player management: Next.js App Router, Tailwind styling, verified route protection middleware, registration and login flows, player CRUD APIs, a Server Action for creating players, a Prisma schema with an applied initial migration, and a reusable Prisma client. Match and performance management are not implemented yet.
+The project currently provides the application foundation, complete cookie-based JWT authentication, team/player management, and a player Impact Score leaderboard: Next.js App Router, Tailwind styling, verified route protection middleware, registration and login flows, player CRUD APIs, a Server Action for creating players, a shared Impact Score utility with Vitest coverage, a Prisma schema with an applied initial migration, and a reusable Prisma client. Match and performance management are not implemented yet.
 
 ## Tech stack
 
@@ -15,6 +15,7 @@ The project currently provides the application foundation, complete cookie-based
 | ORM | Prisma 6.19 |
 | Database | PostgreSQL (Neon-compatible) |
 | Authentication | bcryptjs, jose, Zod |
+| Testing | Vitest 5 |
 | Linting | ESLint 9 with `eslint-config-next` |
 
 ## Prerequisites
@@ -93,6 +94,8 @@ Never commit the real value or expose it to client components.
 | `npm run start` | `next start` | Run the production build |
 | `npm run lint` | `eslint .` | Lint the project |
 | `npm run typecheck` | `tsc --noEmit` | Type-check without emitting files |
+| `npm test` | `vitest run` | Run the unit tests once |
+| `npm run test:watch` | `vitest` | Run tests in watch mode |
 | `npm run prisma:generate` | `prisma generate` | Generate the Prisma client |
 | `npm run prisma:migrate` | `prisma migrate dev` | Create/apply migrations in development |
 | `npm run prisma:deploy` | `prisma migrate deploy` | Apply existing migrations |
@@ -115,6 +118,7 @@ Never commit the real value or expose it to client components.
 │   │   │   │   ├── login/route.ts
 │   │   │   │   ├── logout/route.ts
 │   │   │   │   └── register/route.ts
+│   │   │   ├── leaderboard/route.ts
 │   │   │   ├── players/
 │   │   │   │   ├── [id]/route.ts
 │   │   │   │   └── route.ts
@@ -125,6 +129,7 @@ Never commit the real value or expose it to client components.
 │   │   │   ├── _actions/
 │   │   │   │   ├── players.ts
 │   │   │   │   └── teams.ts
+│   │   │   ├── leaderboard/page.tsx
 │   │   │   ├── players/[id]/
 │   │   │   │   ├── edit/page.tsx
 │   │   │   │   ├── not-found.tsx
@@ -149,6 +154,7 @@ Never commit the real value or expose it to client components.
 │   │   ├── DeleteTeamButton.tsx
 │   │   ├── EditPlayerForm.tsx
 │   │   ├── FieldError.tsx
+│   │   ├── LeaderboardTable.tsx
 │   │   ├── PlayerFilters.tsx
 │   │   ├── PlayerFormFields.tsx
 │   │   ├── PlayerTable.tsx
@@ -163,7 +169,10 @@ Never commit the real value or expose it to client components.
 │   │   ├── auth.ts
 │   │   ├── format.ts
 │   │   ├── form-state.ts
+│   │   ├── impact-score.test.ts
+│   │   ├── impact-score.ts
 │   │   ├── jwt.ts
+│   │   ├── leaderboard.ts
 │   │   ├── player-constants.ts
 │   │   ├── players.ts
 │   │   ├── prisma.ts
@@ -191,7 +200,8 @@ Never commit the real value or expose it to client components.
 | `/login` | Public | Login form; authenticated users are redirected to the dashboard |
 | `/register` | Public | Registration form; authenticated users are redirected to the dashboard |
 | `/dashboard` | Protected | Player listing, filters, add-player form, and team manager |
-| `/dashboard/players/[id]` | Protected | Player details |
+| `/dashboard/leaderboard` | Protected | Player Impact Score rankings |
+| `/dashboard/players/[id]` | Protected | Player details, including Impact Score |
 | `/dashboard/players/[id]/edit` | Protected | Edit player form |
 
 | API route | Description |
@@ -199,6 +209,7 @@ Never commit the real value or expose it to client components.
 | `POST /api/auth/register` | Validates input, checks duplicate email, hashes the password, creates the user, and sets a session cookie |
 | `POST /api/auth/login` | Validates credentials, compares the bcrypt hash, and sets a session cookie |
 | `POST /api/auth/logout` | Clears the session cookie |
+| `GET /api/leaderboard` | Returns players ranked by Impact Score |
 | `GET /api/players` | Lists players; supports optional `teamId` and `role` query filters |
 | `POST /api/players` | Creates a player after Zod validation and team-reference validation |
 | `GET /api/players/[id]` | Returns one player |
@@ -228,6 +239,29 @@ The cookie is `httpOnly`, `sameSite=lax`, `secure` in production, and expires af
 - Zod validates all player fields. `basePrice`, `matchesPlayed`, `totalRuns`, and `totalWickets` must be non-negative; integer fields must be whole numbers. The existing database CHECK constraints provide a second layer of protection.
 - IDs submitted by the client are never trusted for authorization. The session identifies the user, player IDs are checked against the database, and team IDs are validated before create or update.
 
+## Impact Score
+
+Impact Score is calculated by the shared `calculateImpactScore()` function in `src/lib/impact-score.ts`. The leaderboard page, `GET /api/leaderboard`, player API responses, and player details all use this same function.
+
+The formula is:
+
+```text
+Base score = (runs * 1.2) + (wickets * 20)
+
+Batter:       multiply runs by 1.3 before calculating the run contribution
+Bowler:       multiply wickets by 1.5 before calculating the wicket contribution
+All-rounder:  use the normal base formula
+Wicketkeeper: use the normal base formula, then add a flat 30 points
+
+Matches < 5:  subtract 50
+Matches > 20: add 100
+Otherwise:    no experience adjustment
+```
+
+Role adjustments are applied first, followed by the experience adjustment, then the wicketkeeper bonus. The wicketkeeper bonus never applies the bowler multiplier. Invalid input, including negative values, non-finite numbers, or an unknown role, returns `0`.
+
+Worked example: a batter with 100 runs, 2 wickets, and 10 matches scores `(100 * 1.3 * 1.2) + (2 * 20) = 196`. The same statistics as a bowler score `(100 * 1.2) + (2 * 1.5 * 20) = 180`.
+
 ## Database schema
 
 The Prisma schema is defined in `prisma/schema.prisma`.
@@ -254,6 +288,9 @@ Implemented:
 - Team creation/listing with duplicate-name protection and safe deletion
 - Player create, list, detail, edit, team selection, and team/role filters
 - Add-player Server Action and authenticated player/team APIs
+- Shared Impact Score calculation with role, experience, and wicketkeeper adjustments
+- Protected leaderboard page and authenticated leaderboard API
+- Vitest unit tests for the Impact Score formula
 - Responsive dashboard with loading, empty, and error states
 - Zod validation and field-level error responses
 - Prisma schema, initial migration, and reusable client
@@ -263,4 +300,4 @@ Not yet implemented:
 - Match and performance management
 - Role-based authorization and per-user data ownership
 - Rate limiting and brute-force protection
-- Automated test suite and seed data
+- Expanded integration test suite and seed data

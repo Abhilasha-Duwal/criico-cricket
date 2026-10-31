@@ -1,3 +1,4 @@
+import Link from "next/link";
 import AddPlayerForm from "@/components/AddPlayerForm";
 import PlayerFilters from "@/components/PlayerFilters";
 import PlayerTable from "@/components/PlayerTable";
@@ -74,7 +75,15 @@ export default async function DashboardPage({
           <p className="mt-2 text-sm text-slate-400">{user.email}</p>
         </div>
 
-        <LogoutButton />
+        <div className="flex flex-wrap items-center gap-3">
+          <Link
+            href="/dashboard/leaderboard"
+            className="rounded-lg bg-emerald-500 px-4 py-2 text-sm font-semibold text-slate-950 transition hover:bg-emerald-400"
+          >
+            View leaderboard
+          </Link>
+          <LogoutButton />
+        </div>
       </header>
 
       <section className="mt-8 grid grid-cols-2 gap-3 sm:grid-cols-4">

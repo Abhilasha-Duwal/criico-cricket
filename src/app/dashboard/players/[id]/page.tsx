@@ -1,7 +1,8 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { requireUser } from "@/lib/auth";
-import { formatCurrency, formatDate } from "@/lib/format";
+import { formatCurrency, formatDate, formatImpactScore } from "@/lib/format";
+import { calculateImpactScore } from "@/lib/impact-score";
 import {
   PLAYER_ROLE_BADGE_CLASSES,
   PLAYER_ROLE_LABELS,
@@ -24,7 +25,15 @@ export default async function PlayerDetailPage({
     notFound();
   }
 
+  const impactScore = calculateImpactScore({
+    role: player.role,
+    runs: player.totalRuns,
+    wickets: player.totalWickets,
+    matchesPlayed: player.matchesPlayed,
+  });
+
   const stats = [
+    { label: "Impact score", value: formatImpactScore(impactScore) },
     { label: "Base price", value: formatCurrency(player.basePrice.toString()) },
     { label: "Matches played", value: player.matchesPlayed.toLocaleString("en-IN") },
     { label: "Total runs", value: player.totalRuns.toLocaleString("en-IN") },
@@ -65,7 +74,7 @@ export default async function PlayerDetailPage({
         </Link>
       </div>
 
-      <section className="mt-8 grid grid-cols-2 gap-3 lg:grid-cols-4">
+      <section className="mt-8 grid grid-cols-2 gap-3 lg:grid-cols-5">
         {stats.map((stat) => (
           <div
             key={stat.label}
