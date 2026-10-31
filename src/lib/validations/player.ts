@@ -1,6 +1,8 @@
 import { z } from "zod";
 import { PLAYER_ROLES } from "@/lib/player-constants";
 
+export const NEGATIVE_TOTAL_RUNS_MESSAGE = "Total runs cannot be negative.";
+
 function toNumber(value: unknown) {
   if (typeof value === "string") {
     const trimmed = value.trim();
@@ -33,7 +35,7 @@ const totalRunsSchema = z.preprocess(
   z
     .number({ error: "Total runs must be a number." })
     .int("Total runs must be a whole number.")
-    .min(0, "Total runs cannot be negative.")
+    .min(0, NEGATIVE_TOTAL_RUNS_MESSAGE)
     .max(2_147_483_647, "Total runs is too large."),
 );
 

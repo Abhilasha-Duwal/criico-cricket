@@ -3,6 +3,12 @@
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useState, type FormEvent } from "react";
+import { toast } from "sonner";
+import {
+  getPlayerFormErrorMessage,
+  readPlayerFormValues,
+  validatePlayerFormValues,
+} from "@/lib/player-form-validation";
 import type { FieldErrors } from "@/lib/validations/shared";
 import PlayerFormFields, { type TeamOption } from "./PlayerFormFields";
 
@@ -43,25 +49,27 @@ export default function EditPlayerForm({
       return;
     }
 
+    const formData = new FormData(event.currentTarget);
+    const validation = validatePlayerFormValues(
+      readPlayerFormValues(formData),
+    );
+
+    if (!validation.success) {
+      setError(validation.message);
+      setFieldErrors(validation.fieldErrors);
+      toast.error(validation.message);
+      return;
+    }
+
     setError(null);
     setFieldErrors({});
     setIsSubmitting(true);
-
-    const formData = new FormData(event.currentTarget);
 
     try {
       const response = await fetch(`/api/players/${player.id}`, {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          name: String(formData.get("name") ?? ""),
-          role: String(formData.get("role") ?? ""),
-          basePrice: String(formData.get("basePrice") ?? ""),
-          matchesPlayed: String(formData.get("matchesPlayed") ?? ""),
-          totalRuns: String(formData.get("totalRuns") ?? ""),
-          totalWickets: String(formData.get("totalWickets") ?? ""),
-          teamId: String(formData.get("teamId") ?? ""),
-        }),
+        body: JSON.stringify(validation.data),
       });
 
       const data = (await response
@@ -69,15 +77,25 @@ export default function EditPlayerForm({
         .catch(() => ({}))) as PlayerApiResponse;
 
       if (!response.ok) {
-        setError(data.error ?? "Unable to update player.");
+        const message = getPlayerFormErrorMessage(
+          data.fieldErrors,
+          data.error ?? "Unable to update player. Please try again.",
+        );
+
+        setError(message);
         setFieldErrors(data.fieldErrors ?? {});
+        toast.error(message);
         return;
       }
 
+      toast.success("Player updated successfully.");
       router.push(`/dashboard/players/${player.id}`);
       router.refresh();
     } catch {
-      setError("Network error. Please try again.");
+      const message = "Network error. Please try again.";
+
+      setError(message);
+      toast.error(message);
     } finally {
       setIsSubmitting(false);
     }

@@ -15,6 +15,7 @@ The project currently provides the application foundation, complete cookie-based
 | ORM | Prisma 6.19 |
 | Database | PostgreSQL (Neon-compatible) |
 | Authentication | bcryptjs, jose, Zod |
+| Notifications | Sonner 2 |
 | Testing | Vitest 5 |
 | Linting | ESLint 9 with `eslint-config-next` |
 
@@ -171,6 +172,7 @@ Never commit the real value or expose it to client components.
 │   │   │   ├── auth.ts
 │   │   │   ├── match.test.ts
 │   │   │   ├── match.ts
+│   │   │   ├── player.test.ts
 │   │   │   ├── player.ts
 │   │   │   ├── shared.ts
 │   │   │   └── team.ts
@@ -188,6 +190,8 @@ Never commit the real value or expose it to client components.
 │   │   ├── match-idempotency.ts
 │   │   ├── matches.ts
 │   │   ├── player-constants.ts
+│   │   ├── player-form-validation.test.ts
+│   │   ├── player-form-validation.ts
 │   │   ├── players.ts
 │   │   ├── prisma.ts
 │   │   ├── redirect.ts
@@ -252,6 +256,8 @@ The cookie is `httpOnly`, `sameSite=lax`, `secure` in production, and expires af
 - The player listing is responsive, with a table on larger screens and cards on mobile. Filters for team and role are applied server-side through the URL query string.
 - The **Add player** form is implemented as a Next.js Server Action (`src/app/dashboard/_actions/players.ts`). It validates the submitted `FormData` with Zod, verifies the selected team exists, creates the player with Prisma, and revalidates the dashboard.
 - The **Edit player** form uses `PUT /api/players/[id]`. It shows field-level validation errors, a loading state, and redirects back to the player details page on success.
+- Both player forms run the same Zod schema on the client before submission and again on the server. Negative `totalRuns` shows the toast `Total runs cannot be negative.`, prevents submission, and displays the same message beside the Total runs input. Negative `matchesPlayed`, `totalWickets`, and `basePrice` receive field-level errors.
+- Sonner provides success and error toasts. Successful create/edit operations show a success toast; server validation, authorization, and network failures show an error toast.
 - Team creation uses a Server Action. Team deletion uses `DELETE /api/teams/[id]` and refuses to delete a team with existing players or match history.
 - Zod validates all player fields. `basePrice`, `matchesPlayed`, `totalRuns`, and `totalWickets` must be non-negative; integer fields must be whole numbers. The existing database CHECK constraints provide a second layer of protection.
 - IDs submitted by the client are never trusted for authorization. The session identifies the user, player IDs are checked against the database, and team IDs are validated before create or update.
@@ -340,7 +346,8 @@ Implemented:
 - Match recording with two-team selection, optional winner, and player performances
 - Transactional match, performance, and aggregate-stat updates with idempotent retries
 - Recorded match history and authenticated matches API
-- Vitest unit tests for Impact Score, leaderboard ranking/serialization, match validation, and idempotency
+- Vitest unit tests for Impact Score, leaderboard ranking/serialization, player form/server validation, match validation, and idempotency
+- Client and server validation for negative player statistics, with Sonner toasts and inline field errors
 - Responsive dashboard with loading, empty, and error states
 - Zod validation and field-level error responses
 - Prisma schema, initial migration, and reusable client

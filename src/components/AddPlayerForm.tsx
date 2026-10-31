@@ -1,8 +1,15 @@
 "use client";
 
-import { useActionState, useEffect, useRef } from "react";
+import { useActionState, useEffect, useRef, useState, type FormEvent } from "react";
+import { toast } from "sonner";
 import { createPlayerAction } from "@/app/dashboard/_actions/players";
 import type { FormActionState } from "@/lib/form-state";
+import {
+  getPlayerFormErrorMessage,
+  readPlayerFormValues,
+  validatePlayerFormValues,
+} from "@/lib/player-form-validation";
+import type { FieldErrors } from "@/lib/validations/shared";
 import PlayerFormFields, { type TeamOption } from "./PlayerFormFields";
 
 const initialState: FormActionState = { status: "idle" };
@@ -13,6 +20,7 @@ type AddPlayerFormProps = {
 
 export default function AddPlayerForm({ teams }: AddPlayerFormProps) {
   const formRef = useRef<HTMLFormElement>(null);
+  const [clientFieldErrors, setClientFieldErrors] = useState<FieldErrors>({});
   const [state, formAction, isPending] = useActionState<
     FormActionState,
     FormData
@@ -21,8 +29,42 @@ export default function AddPlayerForm({ teams }: AddPlayerFormProps) {
   useEffect(() => {
     if (state.status === "success") {
       formRef.current?.reset();
+      setClientFieldErrors({});
+      toast.success(state.message ?? "Player created successfully.");
+    }
+
+    if (state.status === "error") {
+      toast.error(
+        getPlayerFormErrorMessage(
+          state.fieldErrors,
+          state.message ?? "Unable to create player. Please try again.",
+        ),
+      );
     }
   }, [state]);
+
+  function handleSubmit(event: FormEvent<HTMLFormElement>) {
+    const validation = validatePlayerFormValues(
+      readPlayerFormValues(new FormData(event.currentTarget)),
+    );
+
+    if (!validation.success) {
+      event.preventDefault();
+      setClientFieldErrors(validation.fieldErrors);
+      toast.error(validation.message);
+      return;
+    }
+
+    setClientFieldErrors({});
+  }
+
+  const fieldErrors = isPending
+    ? {}
+    : Object.keys(clientFieldErrors).length > 0
+      ? clientFieldErrors
+      : state.status === "error"
+        ? (state.fieldErrors ?? {})
+        : {};
 
   if (teams.length === 0) {
     return (
@@ -39,8 +81,16 @@ export default function AddPlayerForm({ teams }: AddPlayerFormProps) {
   }
 
   return (
-    <form ref={formRef} action={formAction} className="space-y-4">
-      {state.status === "error" && state.message ? (
+    <form
+      ref={formRef}
+      action={formAction}
+      onSubmit={handleSubmit}
+      noValidate
+      className="space-y-4"
+    >
+      {Object.keys(clientFieldErrors).length === 0 &&
+      state.status === "error" &&
+      state.message ? (
         <div
           role="alert"
           className="rounded-lg border border-red-900 bg-red-950/50 px-4 py-3 text-sm text-red-300"
@@ -49,7 +99,9 @@ export default function AddPlayerForm({ teams }: AddPlayerFormProps) {
         </div>
       ) : null}
 
-      {state.status === "success" && state.message ? (
+      {Object.keys(clientFieldErrors).length === 0 &&
+      state.status === "success" &&
+      state.message ? (
         <div
           role="status"
           className="rounded-lg border border-emerald-900 bg-emerald-950/50 px-4 py-3 text-sm text-emerald-300"
@@ -61,7 +113,7 @@ export default function AddPlayerForm({ teams }: AddPlayerFormProps) {
       <PlayerFormFields
         teams={teams}
         values={state.values}
-        fieldErrors={state.fieldErrors}
+        fieldErrors={fieldErrors}
         disabled={isPending}
       />
 
