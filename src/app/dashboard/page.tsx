@@ -6,7 +6,7 @@ import PlayerTable from "@/components/PlayerTable";
 import TeamManager from "@/components/TeamManager";
 import { requireUser } from "@/lib/auth";
 import { parsePage } from "@/lib/pagination";
-import { listPlayersPage } from "@/lib/players";
+import { listPlayersPage, serializePlayer } from "@/lib/players";
 import { listTeams } from "@/lib/teams";
 import { playerFilterSchema } from "@/lib/validations/player";
 import LogoutButton from "./LogoutButton";
@@ -49,6 +49,8 @@ export default async function DashboardPage({
       pageSize: PLAYERS_PAGE_SIZE,
     }),
   ]);
+
+  const serializedPlayers = playerPage.players.map(serializePlayer);
 
   const teamOptions = teams.map((team) => ({
     id: team.id,
@@ -133,7 +135,7 @@ export default async function DashboardPage({
           />
 
           <PlayerTable
-            players={playerPage.players}
+            players={serializedPlayers}
             hasFilters={Boolean(filters.teamId || filters.role)}
           />
 

@@ -17,10 +17,22 @@ export type PlayerWithTeam = Prisma.PlayerGetPayload<{
   include: typeof playerInclude;
 }>;
 
+export type SerializedPlayer = Omit<PlayerWithTeam, "basePrice"> & {
+  basePrice: number;
+  impactScore: number;
+};
+
 export class TeamNotFoundError extends Error {
   constructor() {
     super("Team not found.");
     this.name = "TeamNotFoundError";
+  }
+}
+
+export class PlayerHasPerformancesError extends Error {
+  constructor() {
+    super("Cannot delete this player because they have match history.");
+    this.name = "PlayerHasPerformancesError";
   }
 }
 
@@ -178,6 +190,48 @@ export async function updatePlayer(
 
     if (isPrismaError(error, "P2025")) {
       return null;
+    }
+
+    throw error;
+  }
+}
+
+export async function deletePlayer(id: string): Promise<boolean> {
+  const player = await prisma.player.findUnique({
+    where: { id },
+    select: {
+      id: true,
+      _count: {
+        select: {
+          performances: true,
+        },
+      },
+    },
+  });
+
+  if (!player) {
+    return false;
+  }
+
+  if (player._count.performances > 0) {
+    throw new PlayerHasPerformancesError();
+  }
+
+  try {
+    await prisma.player.delete({
+      where: { id },
+    });
+
+    return true;
+  } catch (error) {
+    if (isPrismaError(error, "P2025")) {
+      return false;
+    }
+
+    // Protect against a performance being recorded
+    // between the history check and the deletion.
+    if (isPrismaError(error, "P2003")) {
+      throw new PlayerHasPerformancesError();
     }
 
     throw error;

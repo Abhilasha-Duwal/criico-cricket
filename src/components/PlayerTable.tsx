@@ -1,17 +1,24 @@
+
+"use client";
+
 import Link from "next/link";
+import { useRouter } from "next/navigation";
+import { useState } from "react";
 import { formatCurrency } from "@/lib/format";
 import {
   PLAYER_ROLE_BADGE_CLASSES,
   PLAYER_ROLE_LABELS,
 } from "@/lib/player-constants";
-import type { PlayerWithTeam } from "@/lib/players";
+import type { SerializedPlayer } from "@/lib/players";
+import { toast } from "sonner";
+import { AlertTriangle, Loader2, Trash2 } from "lucide-react";
 
 type PlayerTableProps = {
-  players: PlayerWithTeam[];
+  players: SerializedPlayer[];
   hasFilters: boolean;
 };
 
-function RoleBadge({ role }: { role: PlayerWithTeam["role"] }) {
+function RoleBadge({ role }: { role: SerializedPlayer["role"] }) {
   return (
     <span
       className={`inline-flex rounded-full border px-2.5 py-1 text-xs font-semibold ${PLAYER_ROLE_BADGE_CLASSES[role]}`}
@@ -20,6 +27,108 @@ function RoleBadge({ role }: { role: PlayerWithTeam["role"] }) {
     </span>
   );
 }
+
+
+function DeletePlayerButton({ player }: { player: SerializedPlayer }) {
+  const router = useRouter();
+  const [showConfirm, setShowConfirm] = useState(false);
+  const [deleting, setDeleting] = useState(false);
+
+  async function handleDelete() {
+    try {
+      setDeleting(true);
+
+      const response = await fetch(`/api/players/${player.id}`, {
+        method: "DELETE",
+      });
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        toast.error(data.error || "Failed to delete player.");
+        return;
+      }
+
+      toast.success("Player deleted successfully.");
+      setShowConfirm(false);
+      router.refresh();
+    } catch {
+      toast.error("Something went wrong while deleting the player.");
+    } finally {
+      setDeleting(false);
+    }
+  }
+
+  return (
+    <>
+      <button
+        type="button"
+        onClick={() => setShowConfirm(true)}
+        className="inline-flex items-center gap-1 rounded-md px-3 py-2 text-sm font-medium text-red-600 hover:bg-red-50"
+      >
+        <Trash2 className="h-4 w-4" />
+        Delete
+      </button>
+
+      {showConfirm && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
+          <div
+            role="alertdialog"
+            aria-modal="true"
+            aria-labelledby="delete-player-title"
+            aria-describedby="delete-player-description"
+            className="w-full max-w-md rounded-xl bg-white p-6 shadow-xl"
+          >
+            <div className="flex items-start gap-3">
+              <div className="rounded-full bg-red-100 p-3">
+                <AlertTriangle className="h-6 w-6 text-red-600" />
+              </div>
+
+              <div>
+                <h2
+                  id="delete-player-title"
+                  className="text-lg font-semibold text-gray-900"
+                >
+                  Delete player?
+                </h2>
+
+                <p
+                  id="delete-player-description"
+                  className="mt-2 text-sm text-gray-600"
+                >
+                  Are you sure you want to delete{" "}
+                  <strong>{player.name}</strong>? This action cannot be undone.
+                </p>
+              </div>
+            </div>
+
+            <div className="mt-6 flex justify-end gap-3">
+              <button
+                type="button"
+                disabled={deleting}
+                onClick={() => setShowConfirm(false)}
+                className="rounded-lg border border-gray-300 px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50 disabled:opacity-50"
+              >
+                Cancel
+              </button>
+
+              <button
+                type="button"
+                disabled={deleting}
+                onClick={handleDelete}
+                className="inline-flex items-center gap-2 rounded-lg bg-red-600 px-4 py-2 text-sm font-medium text-white hover:bg-red-700 disabled:cursor-not-allowed disabled:opacity-50"
+              >
+                {deleting && <Loader2 className="h-4 w-4 animate-spin" />}
+                {deleting ? "Deleting..." : "Delete player"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+    </>
+  );
+}
+
 
 export default function PlayerTable({
   players,
@@ -99,6 +208,7 @@ export default function PlayerTable({
                     >
                       Edit
                     </Link>
+                    <DeletePlayerButton player={player} />
                   </div>
                 </td>
               </tr>
@@ -168,6 +278,7 @@ export default function PlayerTable({
               >
                 Edit
               </Link>
+              <DeletePlayerButton player={player} />
             </div>
           </article>
         ))}
