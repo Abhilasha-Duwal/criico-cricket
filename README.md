@@ -2,7 +2,7 @@
 
 A cricket team management application built with Next.js 15, React 19, TypeScript, Tailwind CSS, Prisma 6, and PostgreSQL.
 
-The project currently provides the application foundation, complete cookie-based JWT authentication, team/player management, and a player Impact Score leaderboard: Next.js App Router, Tailwind styling, verified route protection middleware, registration and login flows, player CRUD APIs, a Server Action for creating players, a shared Impact Score utility with Vitest coverage, a Prisma schema with an applied initial migration, and a reusable Prisma client. Match and performance management are not implemented yet.
+The project currently provides the application foundation, complete cookie-based JWT authentication, team/player management, transactional match recording, and a player Impact Score leaderboard: Next.js App Router, Tailwind styling, verified route protection middleware, registration and login flows, player CRUD APIs, a Server Action for creating players, an idempotent match API that updates aggregate player statistics, a shared Impact Score utility with Vitest coverage, a Prisma schema with an applied initial migration, and a reusable Prisma client.
 
 ## Tech stack
 
@@ -119,6 +119,7 @@ Never commit the real value or expose it to client components.
 │   │   │   │   ├── logout/route.ts
 │   │   │   │   └── register/route.ts
 │   │   │   ├── leaderboard/route.ts
+│   │   │   ├── matches/route.ts
 │   │   │   ├── players/
 │   │   │   │   ├── [id]/route.ts
 │   │   │   │   └── route.ts
@@ -130,6 +131,7 @@ Never commit the real value or expose it to client components.
 │   │   │   │   ├── players.ts
 │   │   │   │   └── teams.ts
 │   │   │   ├── leaderboard/page.tsx
+│   │   │   ├── matches/page.tsx
 │   │   │   ├── players/[id]/
 │   │   │   │   ├── edit/page.tsx
 │   │   │   │   ├── not-found.tsx
@@ -155,6 +157,8 @@ Never commit the real value or expose it to client components.
 │   │   ├── EditPlayerForm.tsx
 │   │   ├── FieldError.tsx
 │   │   ├── LeaderboardTable.tsx
+│   │   ├── MatchHistory.tsx
+│   │   ├── MatchRecorder.tsx
 │   │   ├── PlayerFilters.tsx
 │   │   ├── PlayerFormFields.tsx
 │   │   ├── PlayerTable.tsx
@@ -162,6 +166,8 @@ Never commit the real value or expose it to client components.
 │   ├── lib/
 │   │   ├── validations/
 │   │   │   ├── auth.ts
+│   │   │   ├── match.test.ts
+│   │   │   ├── match.ts
 │   │   │   ├── player.ts
 │   │   │   ├── shared.ts
 │   │   │   └── team.ts
@@ -173,6 +179,9 @@ Never commit the real value or expose it to client components.
 │   │   ├── impact-score.ts
 │   │   ├── jwt.ts
 │   │   ├── leaderboard.ts
+│   │   ├── match-idempotency.test.ts
+│   │   ├── match-idempotency.ts
+│   │   ├── matches.ts
 │   │   ├── player-constants.ts
 │   │   ├── players.ts
 │   │   ├── prisma.ts
@@ -201,6 +210,7 @@ Never commit the real value or expose it to client components.
 | `/register` | Public | Registration form; authenticated users are redirected to the dashboard |
 | `/dashboard` | Protected | Player listing, filters, add-player form, and team manager |
 | `/dashboard/leaderboard` | Protected | Player Impact Score rankings |
+| `/dashboard/matches` | Protected | Match recording form and recorded match history |
 | `/dashboard/players/[id]` | Protected | Player details, including Impact Score |
 | `/dashboard/players/[id]/edit` | Protected | Edit player form |
 
@@ -210,6 +220,8 @@ Never commit the real value or expose it to client components.
 | `POST /api/auth/login` | Validates credentials, compares the bcrypt hash, and sets a session cookie |
 | `POST /api/auth/logout` | Clears the session cookie |
 | `GET /api/leaderboard` | Returns players ranked by Impact Score |
+| `GET /api/matches` | Lists recorded matches with teams, winner, and player performances |
+| `POST /api/matches` | Records a match and its player performances in one transaction; supports idempotent retries |
 | `GET /api/players` | Lists players; supports optional `teamId` and `role` query filters |
 | `POST /api/players` | Creates a player after Zod validation and team-reference validation |
 | `GET /api/players/[id]` | Returns one player |
@@ -262,6 +274,34 @@ Role adjustments are applied first, followed by the experience adjustment, then 
 
 Worked example: a batter with 100 runs, 2 wickets, and 10 matches scores `(100 * 1.3 * 1.2) + (2 * 20) = 196`. The same statistics as a bowler score `(100 * 1.2) + (2 * 1.5 * 20) = 180`.
 
+## Match recording and aggregate statistics
+
+- The protected match page is available at `/dashboard/matches`. It loads teams, players, and recent matches on the server; the client form submits to `POST /api/matches`.
+- `matchInputSchema` validates two distinct team IDs, an optional winner that must be one of the participants, and a performance array. Runs and wickets must be non-negative integers. Duplicate player IDs are rejected before the database write.
+- The server re-validates every referenced team and player inside the transaction. Each performance player must belong to team A or team B.
+- `createMatch()` uses one interactive `prisma.$transaction` to create the `Match`, create its `PlayerPerformance` rows, and increment each affected player's `matchesPlayed`, `totalRuns`, and `totalWickets`. If any step fails, the match, performances, and aggregate changes roll back together.
+- Aggregate values are never accepted from the client. They are updated with atomic Prisma `increment` operations based only on the recorded performance.
+- Idempotency prevents double-counting. The UI sends a UUID `clientRequestId`, which is used as the match ID. Retrying the same request returns the existing match with `replayed: true` and does not increment statistics again. If no request ID is supplied, a deterministic SHA-256 fingerprint of the normalized payload is used as the match ID, so an identical retry is also deduplicated. Reusing a request ID with different match details returns `409`. Clients that need to record an identical rematch should send a new UUID.
+- The unique `(matchId, playerId)` constraint and the Zod duplicate check prevent duplicate performances. Database check constraints also reject negative performance statistics.
+- The page displays recorded matches with team totals and each player's runs and wickets. `GET /api/matches` returns the same data for API consumers.
+
+Example request:
+
+```json
+{
+  "clientRequestId": "1b9d6bcd-bbfd-4b2d-9b5d-ab8dfbbd4bed",
+  "teamAId": "team_a_id",
+  "teamBId": "team_b_id",
+  "winnerId": "team_a_id",
+  "performances": [
+    { "playerId": "player_1_id", "runs": 42, "wickets": 1 },
+    { "playerId": "player_2_id", "runs": 10, "wickets": 3 }
+  ]
+}
+```
+
+Use `"winnerId": null` for no winner. Omit `clientRequestId` only when the deterministic payload fingerprint is sufficient for retry protection.
+
 ## Database schema
 
 The Prisma schema is defined in `prisma/schema.prisma`.
@@ -290,14 +330,18 @@ Implemented:
 - Add-player Server Action and authenticated player/team APIs
 - Shared Impact Score calculation with role, experience, and wicketkeeper adjustments
 - Protected leaderboard page and authenticated leaderboard API
-- Vitest unit tests for the Impact Score formula
+- Match recording with two-team selection, optional winner, and player performances
+- Transactional match, performance, and aggregate-stat updates with idempotent retries
+- Recorded match history and authenticated matches API
+- Vitest unit tests for Impact Score, match validation, and idempotency
 - Responsive dashboard with loading, empty, and error states
 - Zod validation and field-level error responses
 - Prisma schema, initial migration, and reusable client
 
 Not yet implemented:
 
-- Match and performance management
+- Editing or deleting recorded matches
+- Playing XI and lineup management
 - Role-based authorization and per-user data ownership
 - Rate limiting and brute-force protection
 - Expanded integration test suite and seed data

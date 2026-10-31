@@ -77,10 +77,16 @@ export default async function DashboardPage({
 
         <div className="flex flex-wrap items-center gap-3">
           <Link
-            href="/dashboard/leaderboard"
+            href="/dashboard/matches"
             className="rounded-lg bg-emerald-500 px-4 py-2 text-sm font-semibold text-slate-950 transition hover:bg-emerald-400"
           >
-            View leaderboard
+            Record match
+          </Link>
+          <Link
+            href="/dashboard/leaderboard"
+            className="rounded-lg border border-slate-700 px-4 py-2 text-sm font-semibold text-slate-200 transition hover:border-slate-500 hover:bg-slate-900"
+          >
+            Leaderboard
           </Link>
           <LogoutButton />
         </div>
