@@ -1,0 +1,94 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider  = "postgresql"
+  url       = env("DATABASE_URL")
+  directUrl = env("DIRECT_URL")
+}
+
+enum PlayerRole {
+  BATTER
+  BOWLER
+  ALL_ROUNDER
+  WICKET_KEEPER
+}
+
+model User {
+  id           String   @id @default(cuid())
+  name         String
+  email        String   @unique
+  passwordHash String
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  @@map("users")
+}
+
+model Team {
+  id        String   @id @default(cuid())
+  name      String   @unique
+  createdAt DateTime @default(now())
+
+  players        Player[]
+  matchesAsTeamA Match[]  @relation("MatchTeamA")
+  matchesAsTeamB Match[]  @relation("MatchTeamB")
+  matchesWon     Match[]  @relation("MatchWinner")
+
+  @@map("teams")
+}
+
+model Player {
+  id            String     @id @default(cuid())
+  name          String
+  role          PlayerRole
+  basePrice     Decimal    @default(0) @db.Decimal(12, 2)
+  matchesPlayed Int        @default(0)
+  totalRuns     Int        @default(0)
+  totalWickets  Int        @default(0)
+  teamId        String
+  createdAt     DateTime   @default(now())
+  updatedAt     DateTime   @updatedAt
+
+  team         Team                @relation(fields: [teamId], references: [id], onDelete: Restrict)
+  performances PlayerPerformance[]
+
+  @@index([teamId])
+  @@index([role])
+  @@map("players")
+}
+
+model Match {
+  id       String   @id @default(cuid())
+  teamAId  String
+  teamBId  String
+  winnerId String?
+  playedAt DateTime @default(now())
+
+  teamA        Team                @relation("MatchTeamA", fields: [teamAId], references: [id], onDelete: Restrict)
+  teamB        Team                @relation("MatchTeamB", fields: [teamBId], references: [id], onDelete: Restrict)
+  winner       Team?               @relation("MatchWinner", fields: [winnerId], references: [id], onDelete: SetNull)
+  performances PlayerPerformance[]
+
+  @@index([teamAId])
+  @@index([teamBId])
+  @@index([winnerId])
+  @@index([playedAt])
+  @@map("matches")
+}
+
+model PlayerPerformance {
+  id       String @id @default(cuid())
+  matchId  String
+  playerId String
+  runs     Int    @default(0)
+  wickets  Int    @default(0)
+
+  match  Match  @relation(fields: [matchId], references: [id], onDelete: Cascade)
+  player Player @relation(fields: [playerId], references: [id], onDelete: Restrict)
+
+  @@unique([matchId, playerId])
+  @@index([playerId])
+  @@map("player_performances")
+}
