@@ -14,7 +14,7 @@ export default function LoginPage() {
           </p>
         </div>
 
-        <form className="space-y-4">
+        <form method="post" className="space-y-4">
           <label className="block space-y-2 text-sm font-medium">
             <span>Email</span>
             <input
