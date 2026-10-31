@@ -69,12 +69,18 @@ export default function AddPlayerForm({ teams }: AddPlayerFormProps) {
   if (teams.length === 0) {
     return (
       <div className="rounded-lg border border-dashed border-slate-700 bg-slate-950/40 p-4 text-sm text-slate-400">
-        Create a team first, then add players to it.{" "}
+        <p className="font-semibold text-slate-200">
+          Create a team before adding players.
+        </p>
+        <p className="mt-1">
+          Every player must belong to a team. The Add player form will appear
+          after your first team is created.
+        </p>
         <a
           href="#team-manager"
-          className="font-semibold text-emerald-400 hover:text-emerald-300"
+          className="mt-3 inline-flex rounded-lg border border-emerald-700 px-3 py-2 font-semibold text-emerald-400 transition hover:border-emerald-500 hover:text-emerald-300"
         >
-          Go to teams
+          Create your first team
         </a>
       </div>
     );

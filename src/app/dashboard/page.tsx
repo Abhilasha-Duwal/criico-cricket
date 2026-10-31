@@ -118,10 +118,10 @@ export default async function DashboardPage({
               </p>
             </div>
             <a
-              href="#add-player"
+              href={teamOptions.length > 0 ? "#add-player" : "#team-manager"}
               className="rounded-lg bg-emerald-500 px-4 py-2 text-sm font-semibold text-slate-950 transition hover:bg-emerald-400"
             >
-              Add player
+              {teamOptions.length > 0 ? "Add player" : "Create team first"}
             </a>
           </div>
 
