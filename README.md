@@ -2,7 +2,7 @@
 
 A cricket team management application built with Next.js 15, React 19, TypeScript, Tailwind CSS, Prisma 6, and PostgreSQL.
 
-The project currently provides the full application foundation: Next.js App Router, Tailwind styling, route protection middleware, a Prisma schema with an applied initial migration, and a reusable Prisma client. Authentication and cricket management features are not implemented yet.
+The project currently provides the application foundation and complete cookie-based JWT authentication: Next.js App Router, Tailwind styling, verified route protection middleware, registration and login flows, a Prisma schema with an applied initial migration, and a reusable Prisma client. Cricket management features are not implemented yet.
 
 ## Tech stack
 
@@ -14,6 +14,7 @@ The project currently provides the full application foundation: Next.js App Rout
 | Styling | Tailwind CSS 3.4, PostCSS, Autoprefixer |
 | ORM | Prisma 6.19 |
 | Database | PostgreSQL (Neon-compatible) |
+| Authentication | bcryptjs, jose, Zod |
 | Linting | ESLint 9 with `eslint-config-next` |
 
 ## Prerequisites
@@ -70,9 +71,18 @@ The project currently provides the full application foundation: Next.js App Rout
 | --- | --- | --- |
 | `DATABASE_URL` | Yes | Pooled PostgreSQL connection used by Prisma Client at runtime |
 | `DIRECT_URL` | Yes | Direct, non-pooled connection used by Prisma Migrate |
+| `JWT_SECRET` | Yes | Secret used to sign and verify JWT session tokens. Must be at least 32 characters |
 | `NODE_ENV` | No | Controls Prisma client logging (`development` enables query logs) |
 
 For Neon, `DATABASE_URL` uses the `-pooler` host and `DIRECT_URL` uses the direct host. For a local PostgreSQL instance, both values can be identical. See `.env.example` for the placeholder format.
+
+Generate a strong local JWT secret with:
+
+```bash
+openssl rand -hex 32
+```
+
+Never commit the real value or expose it to client components.
 
 ## Available scripts
 
@@ -100,13 +110,30 @@ For Neon, `DATABASE_URL` uses the `-pooler` host and `DIRECT_URL` uses the direc
 │   └── schema.prisma
 ├── src/
 │   ├── app/
-│   │   ├── dashboard/page.tsx
-│   │   ├── login/page.tsx
+│   │   ├── api/auth/
+│   │   │   ├── login/route.ts
+│   │   │   ├── logout/route.ts
+│   │   │   └── register/route.ts
+│   │   ├── dashboard/
+│   │   │   ├── LogoutButton.tsx
+│   │   │   └── page.tsx
+│   │   ├── login/
+│   │   │   ├── LoginForm.tsx
+│   │   │   └── page.tsx
+│   │   ├── register/
+│   │   │   ├── RegisterForm.tsx
+│   │   │   └── page.tsx
 │   │   ├── globals.css
+│   │   ├── icon.svg
 │   │   ├── layout.tsx
 │   │   └── page.tsx
 │   ├── lib/
-│   │   └── prisma.ts
+│   │   ├── validations/auth.ts
+│   │   ├── auth.ts
+│   │   ├── jwt.ts
+│   │   ├── prisma.ts
+│   │   └── redirect.ts
+│   ├── types/css.d.ts
 │   └── middleware.ts
 ├── .env.example
 ├── .gitignore
@@ -125,10 +152,26 @@ For Neon, `DATABASE_URL` uses the `-pooler` host and `DIRECT_URL` uses the direc
 | Route | Access | Description |
 | --- | --- | --- |
 | `/` | Public | Home page |
-| `/login` | Public | Login UI placeholder |
-| `/dashboard` | Protected | Placeholder page behind middleware |
+| `/login` | Public | Login form; authenticated users are redirected to the dashboard |
+| `/register` | Public | Registration form; authenticated users are redirected to the dashboard |
+| `/dashboard` | Protected | Requires a valid, unexpired JWT session |
 
-The middleware protects `/dashboard/:path*`. If the `session` cookie is missing, the request is redirected to `/login?next=<original-path>`. This is a placeholder gate only; no authentication is implemented yet.
+| API route | Description |
+| --- | --- |
+| `POST /api/auth/register` | Validates input, checks duplicate email, hashes the password, creates the user, and sets a session cookie |
+| `POST /api/auth/login` | Validates credentials, compares the bcrypt hash, and sets a session cookie |
+| `POST /api/auth/logout` | Clears the session cookie |
+
+The middleware protects `/dashboard/:path*`, verifies the JWT signature and expiration with `jose`, redirects unauthenticated users to `/login?next=<original-path>`, and redirects authenticated users away from `/login` and `/register`. The `next` destination is validated to prevent open redirects.
+
+## Authentication flow
+
+1. **Registration** — Zod validates name, email, and password. The email is normalized to lowercase, checked for duplicates, and the password is hashed with bcrypt (cost 12) before the user is created in Prisma. A signed JWT is then stored in an HTTP-only cookie.
+2. **Login** — Zod validates the credentials. The password is compared with `bcrypt.compare`, and a new JWT is issued only on success. Failed logins return a generic error so account existence is not revealed.
+3. **Session verification** — The JWT contains the user ID, name, and email, and is signed with `JWT_SECRET` using HS256. Middleware verifies it on every protected request. Server components call `getCurrentUser()` or `requireUser()`, which verify the token again and load the user by the ID inside the token — never by a client-supplied ID.
+4. **Logout** — `POST /api/auth/logout` expires the session cookie and the dashboard redirects to `/login`.
+
+The cookie is `httpOnly`, `sameSite=lax`, `secure` in production, and expires after 7 days. Passwords and password hashes are never returned by the API.
 
 ## Database schema
 
@@ -149,12 +192,16 @@ The Prisma schema is defined in `prisma/schema.prisma`.
 Implemented:
 
 - Next.js App Router with TypeScript and Tailwind CSS
-- Basic home, login, and protected dashboard pages
-- Route protection middleware
+- Registration, login, and logout with bcrypt and JWT
+- HTTP-only session cookies with signature and expiration verification
+- Protected dashboard and auth-route redirects in middleware
+- Server-side session validation with `getCurrentUser()` / `requireUser()`
+- Zod validation and field-level error responses
 - Prisma schema, initial migration, and reusable client
 
 Not yet implemented:
 
-- Authentication and session management
 - Team, player, match, and performance CRUD features
-- API routes or server actions for cricket data
+- Role-based authorization
+- Rate limiting and brute-force protection
+- Automated test suite and seed data

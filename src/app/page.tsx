@@ -23,6 +23,12 @@ export default function HomePage() {
           Sign in
         </Link>
         <Link
+          href="/register"
+          className="rounded-lg border border-slate-700 px-5 py-3 font-semibold text-slate-200 transition hover:border-slate-500 hover:bg-slate-900"
+        >
+          Create account
+        </Link>
+        <Link
           href="/dashboard"
           className="rounded-lg border border-slate-700 px-5 py-3 font-semibold text-slate-200 transition hover:border-slate-500 hover:bg-slate-900"
         >

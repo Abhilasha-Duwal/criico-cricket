@@ -1,6 +1,19 @@
 import Link from "next/link";
+import { safeNextPath } from "@/lib/redirect";
+import LoginForm from "./LoginForm";
 
-export default function LoginPage() {
+type LoginPageProps = {
+  searchParams: Promise<{ next?: string | string[] }>;
+};
+
+export default async function LoginPage({ searchParams }: LoginPageProps) {
+  const params = await searchParams;
+  const nextPath = safeNextPath(params.next);
+  const registerHref =
+    nextPath === "/dashboard"
+      ? "/register"
+      : `/register?next=${encodeURIComponent(nextPath)}`;
+
   return (
     <main className="flex min-h-screen items-center justify-center px-6 py-16">
       <div className="w-full max-w-md space-y-6 rounded-2xl border border-slate-800 bg-slate-900/70 p-8 shadow-xl">
@@ -10,40 +23,21 @@ export default function LoginPage() {
           </Link>
           <h1 className="text-2xl font-bold">Sign in</h1>
           <p className="text-sm text-slate-400">
-            Authentication will be implemented in a later step.
+            Enter your account details to access the dashboard.
           </p>
         </div>
 
-        <form method="post" className="space-y-4">
-          <label className="block space-y-2 text-sm font-medium">
-            <span>Email</span>
-            <input
-              type="email"
-              name="email"
-              placeholder="you@example.com"
-              autoComplete="email"
-              className="w-full rounded-lg border border-slate-700 bg-slate-950 px-4 py-3 text-slate-100 outline-none transition focus:border-emerald-500"
-            />
-          </label>
+        <LoginForm nextPath={nextPath} />
 
-          <label className="block space-y-2 text-sm font-medium">
-            <span>Password</span>
-            <input
-              type="password"
-              name="password"
-              placeholder="Your password"
-              autoComplete="current-password"
-              className="w-full rounded-lg border border-slate-700 bg-slate-950 px-4 py-3 text-slate-100 outline-none transition focus:border-emerald-500"
-            />
-          </label>
-
-          <button
-            type="button"
-            className="w-full rounded-lg bg-emerald-500 px-5 py-3 font-semibold text-slate-950 transition hover:bg-emerald-400"
+        <p className="text-sm text-slate-400">
+          Don&apos;t have an account?{" "}
+          <Link
+            href={registerHref}
+            className="font-semibold text-emerald-400 hover:text-emerald-300"
           >
-            Sign in
-          </button>
-        </form>
+            Create one
+          </Link>
+        </p>
       </div>
     </main>
   );

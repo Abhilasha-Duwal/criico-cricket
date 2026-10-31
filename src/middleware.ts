@@ -1,19 +1,48 @@
 import { NextResponse, type NextRequest } from "next/server";
+import { SESSION_COOKIE, verifySessionToken } from "@/lib/jwt";
+import { safeNextPath } from "@/lib/redirect";
 
-const SESSION_COOKIE = "session";
+const AUTH_ROUTES = new Set(["/login", "/register"]);
 
-export function middleware(request: NextRequest) {
-  const hasSession = Boolean(request.cookies.get(SESSION_COOKIE)?.value);
+export async function middleware(request: NextRequest) {
+  const { pathname, search } = request.nextUrl;
+  const token = request.cookies.get(SESSION_COOKIE)?.value;
+  const session = token ? await verifySessionToken(token) : null;
+  const isAuthRoute = AUTH_ROUTES.has(pathname);
 
-  if (hasSession) {
-    return NextResponse.next();
+  if (isAuthRoute) {
+    if (session) {
+      const destination = safeNextPath(
+        request.nextUrl.searchParams.get("next"),
+      );
+      return NextResponse.redirect(new URL(destination, request.url));
+    }
+
+    const response = NextResponse.next();
+
+    if (token) {
+      response.cookies.delete(SESSION_COOKIE);
+    }
+
+    return response;
   }
 
-  const loginUrl = new URL("/login", request.url);
-  loginUrl.searchParams.set("next", request.nextUrl.pathname);
-  return NextResponse.redirect(loginUrl);
+  if (!session) {
+    const loginUrl = new URL("/login", request.url);
+    loginUrl.searchParams.set("next", `${pathname}${search}`);
+
+    const response = NextResponse.redirect(loginUrl);
+
+    if (token) {
+      response.cookies.delete(SESSION_COOKIE);
+    }
+
+    return response;
+  }
+
+  return NextResponse.next();
 }
 
 export const config = {
-  matcher: ["/dashboard/:path*"],
+  matcher: ["/dashboard/:path*", "/login", "/register"],
 };
