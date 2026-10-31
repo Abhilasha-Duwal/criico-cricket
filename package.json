@@ -7,6 +7,7 @@
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
+    "postinstall": "prisma generate",
     "lint": "eslint .",
     "typecheck": "tsc --noEmit",
     "prisma:generate": "prisma generate",
@@ -25,6 +26,9 @@
     "react-dom": "^19.3.1",
     "sonner": "^2.0.8",
     "zod": "^4.6.7"
+  },
+  "overrides": {
+    "postcss": "^8.5.32"
   },
   "devDependencies": {
     "@eslint/eslintrc": "^3.3.7",

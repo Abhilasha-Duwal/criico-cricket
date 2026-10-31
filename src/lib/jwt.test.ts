@@ -2,6 +2,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import {
   assertJwtSecret,
   createSessionToken,
+  sessionCookieOptions,
   verifySessionToken,
 } from "./jwt";
 
@@ -55,5 +56,21 @@ describe("JWT session tokens", () => {
     expect(() => assertJwtSecret()).toThrow(
       "JWT_SECRET must be set and at least 32 characters long.",
     );
+  });
+
+  it("uses a secure, HTTP-only, SameSite=Lax cookie in production", () => {
+    vi.stubEnv("NODE_ENV", "production");
+
+    const options = sessionCookieOptions();
+
+    expect(options.httpOnly).toBe(true);
+    expect(options.sameSite).toBe("lax");
+    expect(options.secure).toBe(true);
+  });
+
+  it("does not mark the cookie Secure outside production", () => {
+    vi.stubEnv("NODE_ENV", "test");
+
+    expect(sessionCookieOptions().secure).toBe(false);
   });
 });
