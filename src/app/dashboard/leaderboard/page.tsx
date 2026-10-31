@@ -1,12 +1,28 @@
 import Link from "next/link";
 import LeaderboardTable from "@/components/LeaderboardTable";
+import Pagination from "@/components/Pagination";
 import { requireUser } from "@/lib/auth";
-import { getLeaderboard } from "@/lib/leaderboard-data";
+import { getLeaderboardPage } from "@/lib/leaderboard-data";
+import { parsePage } from "@/lib/pagination";
 
-export default async function LeaderboardPage() {
+const LEADERBOARD_PAGE_SIZE = 10;
+
+type LeaderboardPageProps = {
+  searchParams: Promise<{
+    page?: string | string[];
+  }>;
+};
+
+export default async function LeaderboardPage({
+  searchParams,
+}: LeaderboardPageProps) {
   await requireUser();
+  const params = await searchParams;
 
-  const leaderboard = await getLeaderboard();
+  const leaderboardPage = await getLeaderboardPage({
+    page: parsePage(params.page),
+    pageSize: LEADERBOARD_PAGE_SIZE,
+  });
 
   return (
     <main className="mx-auto max-w-7xl px-4 py-8 sm:px-6 lg:px-8 lg:py-12">
@@ -45,7 +61,7 @@ export default async function LeaderboardPage() {
       </section>
 
       <section className="mt-6">
-        {leaderboard.length === 0 ? (
+        {leaderboardPage.totalItems === 0 ? (
           <div className="rounded-2xl border border-dashed border-slate-700 bg-slate-900/40 px-6 py-12 text-center">
             <p className="font-semibold text-slate-200">
               No players to rank yet.
@@ -61,7 +77,21 @@ export default async function LeaderboardPage() {
             </Link>
           </div>
         ) : (
-          <LeaderboardTable entries={leaderboard} />
+          <>
+            <LeaderboardTable entries={leaderboardPage.entries} />
+
+            <div className="mt-4">
+              <Pagination
+                page={leaderboardPage.page}
+                totalItems={leaderboardPage.totalItems}
+                totalPages={leaderboardPage.totalPages}
+                start={leaderboardPage.start}
+                end={leaderboardPage.end}
+                itemLabel="players"
+                basePath="/dashboard/leaderboard"
+              />
+            </div>
+          </>
         )}
       </section>
     </main>

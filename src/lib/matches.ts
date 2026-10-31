@@ -3,6 +3,7 @@ import {
   buildMatchRequestId,
   matchRequestMatchesExisting,
 } from "@/lib/match-idempotency";
+import { getPaginationMeta, type PaginationMeta } from "@/lib/pagination";
 import { prisma } from "@/lib/prisma";
 import type { MatchInput } from "@/lib/validations/match";
 
@@ -250,6 +251,10 @@ export async function createMatch(
   }
 }
 
+export type PaginatedMatches = PaginationMeta & {
+  matches: MatchWithDetails[];
+};
+
 export async function listMatches(): Promise<MatchWithDetails[]> {
   return prisma.match.findMany({
     include: matchInclude,
@@ -258,6 +263,26 @@ export async function listMatches(): Promise<MatchWithDetails[]> {
     },
     take: 100,
   });
+}
+
+export async function listMatchesPage(
+  { page = 1, pageSize = 5 }: { page?: number; pageSize?: number } = {},
+): Promise<PaginatedMatches> {
+  const total = await prisma.match.count();
+  const meta = getPaginationMeta(total, page, pageSize);
+  const matches = await prisma.match.findMany({
+    include: matchInclude,
+    orderBy: {
+      playedAt: "desc",
+    },
+    skip: (meta.page - 1) * meta.pageSize,
+    take: meta.pageSize,
+  });
+
+  return {
+    ...meta,
+    matches,
+  };
 }
 
 export async function countMatches(): Promise<number> {

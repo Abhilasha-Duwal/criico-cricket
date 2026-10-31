@@ -1,5 +1,6 @@
 import { Prisma } from "@prisma/client";
 import { calculateImpactScore } from "@/lib/impact-score";
+import { getPaginationMeta, type PaginationMeta } from "@/lib/pagination";
 import { prisma } from "@/lib/prisma";
 import type { PlayerInput } from "@/lib/validations/player";
 
@@ -53,9 +54,18 @@ function isPrismaError(error: unknown, code: string): boolean {
   );
 }
 
-export async function listPlayers(
-  filters: { teamId?: string; role?: PlayerInput["role"] } = {},
-): Promise<PlayerWithTeam[]> {
+export type PlayerListFilters = {
+  teamId?: string;
+  role?: PlayerInput["role"];
+};
+
+export type PaginatedPlayers = PaginationMeta & {
+  players: PlayerWithTeam[];
+  totalRuns: number;
+  totalWickets: number;
+};
+
+function playerWhere(filters: PlayerListFilters): Prisma.PlayerWhereInput {
   const where: Prisma.PlayerWhereInput = {};
 
   if (filters.teamId) {
@@ -66,11 +76,50 @@ export async function listPlayers(
     where.role = filters.role;
   }
 
+  return where;
+}
+
+export async function listPlayers(
+  filters: PlayerListFilters = {},
+): Promise<PlayerWithTeam[]> {
   return prisma.player.findMany({
-    where,
+    where: playerWhere(filters),
     include: playerInclude,
     orderBy: { name: "asc" },
   });
+}
+
+export async function listPlayersPage(
+  filters: PlayerListFilters & { page?: number; pageSize?: number } = {},
+): Promise<PaginatedPlayers> {
+  const where = playerWhere(filters);
+  const aggregate = await prisma.player.aggregate({
+    where,
+    _count: { _all: true },
+    _sum: {
+      totalRuns: true,
+      totalWickets: true,
+    },
+  });
+  const meta = getPaginationMeta(
+    aggregate._count._all,
+    filters.page ?? 1,
+    filters.pageSize ?? 10,
+  );
+  const players = await prisma.player.findMany({
+    where,
+    include: playerInclude,
+    orderBy: { name: "asc" },
+    skip: (meta.page - 1) * meta.pageSize,
+    take: meta.pageSize,
+  });
+
+  return {
+    ...meta,
+    players,
+    totalRuns: aggregate._sum.totalRuns ?? 0,
+    totalWickets: aggregate._sum.totalWickets ?? 0,
+  };
 }
 
 export async function getPlayerById(

@@ -1,18 +1,23 @@
 import Link from "next/link";
 import AddPlayerForm from "@/components/AddPlayerForm";
+import Pagination from "@/components/Pagination";
 import PlayerFilters from "@/components/PlayerFilters";
 import PlayerTable from "@/components/PlayerTable";
 import TeamManager from "@/components/TeamManager";
 import { requireUser } from "@/lib/auth";
-import { listPlayers } from "@/lib/players";
+import { parsePage } from "@/lib/pagination";
+import { listPlayersPage } from "@/lib/players";
 import { listTeams } from "@/lib/teams";
 import { playerFilterSchema } from "@/lib/validations/player";
 import LogoutButton from "./LogoutButton";
+
+const PLAYERS_PAGE_SIZE = 10;
 
 type DashboardPageProps = {
   searchParams: Promise<{
     teamId?: string | string[];
     role?: string | string[];
+    page?: string | string[];
   }>;
 };
 
@@ -36,9 +41,13 @@ export default async function DashboardPage({
     ? undefined
     : "Invalid filter selection. Showing all players.";
 
-  const [teams, players] = await Promise.all([
+  const [teams, playerPage] = await Promise.all([
     listTeams(),
-    listPlayers(filters),
+    listPlayersPage({
+      ...filters,
+      page: parsePage(params.page),
+      pageSize: PLAYERS_PAGE_SIZE,
+    }),
   ]);
 
   const teamOptions = teams.map((team) => ({
@@ -46,20 +55,11 @@ export default async function DashboardPage({
     name: team.name,
   }));
 
-  const totalRuns = players.reduce(
-    (total, player) => total + player.totalRuns,
-    0,
-  );
-  const totalWickets = players.reduce(
-    (total, player) => total + player.totalWickets,
-    0,
-  );
-
   const stats = [
     { label: "Teams", value: teams.length },
-    { label: "Players", value: players.length },
-    { label: "Runs", value: totalRuns },
-    { label: "Wickets", value: totalWickets },
+    { label: "Players", value: playerPage.totalItems },
+    { label: "Runs", value: playerPage.totalRuns },
+    { label: "Wickets", value: playerPage.totalWickets },
   ];
 
   return (
@@ -133,8 +133,22 @@ export default async function DashboardPage({
           />
 
           <PlayerTable
-            players={players}
+            players={playerPage.players}
             hasFilters={Boolean(filters.teamId || filters.role)}
+          />
+
+          <Pagination
+            page={playerPage.page}
+            totalItems={playerPage.totalItems}
+            totalPages={playerPage.totalPages}
+            start={playerPage.start}
+            end={playerPage.end}
+            itemLabel="players"
+            basePath="/dashboard"
+            searchParams={{
+              teamId: filters.teamId,
+              role: filters.role,
+            }}
           />
         </section>
 

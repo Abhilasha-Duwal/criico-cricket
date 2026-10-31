@@ -1,19 +1,32 @@
 import Link from "next/link";
 import MatchHistory from "@/components/MatchHistory";
 import MatchRecorder from "@/components/MatchRecorder";
+import Pagination from "@/components/Pagination";
 import { requireUser } from "@/lib/auth";
-import { countMatches, listMatches } from "@/lib/matches";
+import { listMatchesPage } from "@/lib/matches";
+import { parsePage } from "@/lib/pagination";
 import { listPlayers } from "@/lib/players";
 import { listTeams } from "@/lib/teams";
 
-export default async function MatchesPage() {
-  await requireUser();
+const MATCHES_PAGE_SIZE = 5;
 
-  const [teams, players, matches, matchCount] = await Promise.all([
+type MatchesPageProps = {
+  searchParams: Promise<{
+    page?: string | string[];
+  }>;
+};
+
+export default async function MatchesPage({ searchParams }: MatchesPageProps) {
+  await requireUser();
+  const params = await searchParams;
+
+  const [teams, players, matchPage] = await Promise.all([
     listTeams(),
     listPlayers(),
-    listMatches(),
-    countMatches(),
+    listMatchesPage({
+      page: parsePage(params.page),
+      pageSize: MATCHES_PAGE_SIZE,
+    }),
   ]);
 
   const teamOptions = teams.map((team) => ({
@@ -80,7 +93,7 @@ export default async function MatchesPage() {
             Matches
           </p>
           <p className="mt-2 text-2xl font-bold text-slate-100">
-            {matchCount}
+            {matchPage.totalItems}
           </p>
         </div>
       </section>
@@ -97,7 +110,20 @@ export default async function MatchesPage() {
         <MatchRecorder teams={teamOptions} players={playerOptions} />
       </section>
 
-      <MatchHistory matches={matches} />
+      <MatchHistory matches={matchPage.matches} />
+
+      <div className="mt-4">
+        <Pagination
+          page={matchPage.page}
+          totalItems={matchPage.totalItems}
+          totalPages={matchPage.totalPages}
+          start={matchPage.start}
+          end={matchPage.end}
+          itemLabel="matches"
+          basePath="/dashboard/matches"
+          hash="match-history"
+        />
+      </div>
     </main>
   );
 }
